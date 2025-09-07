@@ -133,18 +133,11 @@ jobs:
       - name: Make git happy
         run: |
           git config --global --replace-all safe.directory $GITHUB_WORKSPACE
-      - name: Get checkout token
-        uses: actions/create-github-app-token@v1
-        id: app_token
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PEM }}
-          owner: ${{ github.repository_owner }}
       - name: Checkout repo
         uses: funkincrew/ci-checkout@v7.3.3
         with:
           submodules: 'recursive'
-          token: ${{ steps.app_token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: false
           submodule-aliases: |
             https://github.com/FunkinCrew/Funkin.assets > https://github.com/FunkinCrew/Funkin-assets-secret
@@ -152,7 +145,7 @@ jobs:
       - name: Setup build environment
         uses: ./.github/actions/setup-haxe
         with:
-          gh-token: ${{ steps.app_token.outputs.token }}
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Android SDK/NDK & Java
         run: |
           sudo apt-get update
@@ -189,18 +182,11 @@ jobs:
     env:
       BUILD_DEFINES: ${{ github.event.inputs.build-defines || '-DGITHUB_BUILD' }}
     steps:
-      - name: Get checkout token
-        uses: actions/create-github-app-token@v1
-        id: app_token
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PEM }}
-          owner: ${{ github.repository_owner }}
       - name: Checkout repo
         uses: funkincrew/ci-checkout@v7.3.3
         with:
           submodules: 'recursive'
-          token: ${{ steps.app_token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: false
           submodule-aliases: |
             https://github.com/FunkinCrew/Funkin.assets > https://github.com/FunkinCrew/Funkin-assets-secret
@@ -208,7 +194,7 @@ jobs:
       - name: Config haxelib
         run: |
           haxelib --never newrepo
-          echo "HAXEPATH=$(haxelib config)" >> "$GITHUB_ENV"
+          echo "HAXEPATH=$(haxelib config)" >> \"$GITHUB_ENV\"
       - name: Restore cached dependencies
         id: cache-hmm
         uses: actions/cache@v4
@@ -218,7 +204,7 @@ jobs:
       - if: ${{ steps.cache-hmm.outputs.cache-hit != 'true' }}
         name: Install dependencies
         run: |
-          git config --global 'url.https://x-access-token:${{ steps.app_token.outputs.token }}@github.com/.insteadOf' https://github.com/
+          git config --global 'url.https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/.insteadOf' https://github.com/
           git config --global advice.detachedHead false
           haxelib --global run hmm install -q
           cd .haxelib/hxcpp/git/tools/hxcpp && haxe compile.hxml
@@ -232,7 +218,7 @@ jobs:
           export ANDROID_HOME=/usr/lib/android-sdk
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/bin:$ANDROID_HOME/platform-tools
           yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
-          yes | sdkmanager --sdk_root=$ANDROID_HOME --install "platforms;android-33" "build-tools;33.0.2" "ndk;23.1.7779620"
+          yes | sdkmanager --sdk_root=$ANDROID_HOME --install \"platforms;android-33\" \"build-tools;33.0.2\" \"ndk;23.1.7779620\"
       - name: Build game (android)
         run: |
           haxelib run lime build android -v -release --times $BUILD_DEFINES
