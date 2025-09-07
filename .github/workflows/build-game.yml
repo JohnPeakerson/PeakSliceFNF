@@ -1,6 +1,3 @@
-# Builds the game on all platforms, to ensure it compiles on all target platforms.
-# This helps to ensure workers focus on the master branch.
-
 name: Build and Upload nightly game builds
 
 on:
@@ -124,15 +121,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: windows
-            runs-on: windows
-          - target: macos
-            runs-on: macos
-          # TODO: Install XCode to build iOS
-          # - target: ios
-          #   runs-on: macos
-    runs-on:
-      - ${{ matrix.runs-on }}
+          - target: android
+            runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs-on }}
     defaults:
       run:
         shell: bash
@@ -162,27 +153,21 @@ jobs:
         uses: ./.github/actions/setup-haxe
         with:
           gh-token: ${{ steps.app_token.outputs.token }}
-      - name: Setup HXCPP dev commit
+      - name: Install Android SDK/NDK & Java
         run: |
-          cd .haxelib/hxcpp/git/tools/hxcpp
-          haxe compile.hxml
-          cd ../../../../..
-      - name: Build game (windows)
-        if: ${{ matrix.target == 'windows' }}
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk
+          echo "y" | sdkmanager --install "platforms;android-33" "build-tools;33.0.2" "ndk;23.1.7779620"
+      - name: Build game (android)
         run: |
-          haxelib run lime build windows -v -release $BUILD_DEFINES
+          haxelib run lime build android -v -release --times $BUILD_DEFINES
         timeout-minutes: 120
-      - name: Build game (unix)
-        if: ${{ matrix.target != 'windows' }}
-        run: |
-          haxelib run lime build ${{ matrix.target }} -v -release --times $BUILD_DEFINES
-        timeout-minutes: 120
-      - name: Save build artifact to Github Actions
+      - name: Save APK to Github Actions
         if: ${{ github.event.inputs.save-artifact }}
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.target }}
-          path: export/release/${{matrix.target}}/bin/
+          path: export/release/${{matrix.target}}/bin/app-debug.apk
       - name: Upload build artifacts
         uses: ./.github/actions/upload-itch
         with:
@@ -197,9 +182,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: linux
-          - target: html5
-          # - target: android
+          - target: android
     defaults:
       run:
         shell: bash
@@ -239,23 +222,27 @@ jobs:
           git config --global advice.detachedHead false
           haxelib --global run hmm install -q
           cd .haxelib/hxcpp/git/tools/hxcpp && haxe compile.hxml
-      - if: ${{ matrix.target != 'html5' }}
-        name: Restore hxcpp cache
-        uses: actions/cache@v4
-        with:
-          path: /usr/share/hxcpp
-          key: haxe-hxcpp-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
-          restore-keys: haxe-hxcpp-${{ runner.os }}-${{ github.ref_name }}
-      - name: Build game
+      - name: Install Android SDK/NDK & Java (container)
         run: |
-          haxelib run lime build ${{ matrix.target }} -v -release --times $BUILD_DEFINES
+          apt-get update
+          apt-get install -y openjdk-17-jdk unzip wget
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdtools.zip
+          mkdir -p /usr/lib/android-sdk/cmdline-tools
+          unzip /tmp/cmdtools.zip -d /usr/lib/android-sdk/cmdline-tools
+          export ANDROID_HOME=/usr/lib/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/bin:$ANDROID_HOME/platform-tools
+          yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
+          yes | sdkmanager --sdk_root=$ANDROID_HOME --install "platforms;android-33" "build-tools;33.0.2" "ndk;23.1.7779620"
+      - name: Build game (android)
+        run: |
+          haxelib run lime build android -v -release --times $BUILD_DEFINES
         timeout-minutes: 120
-      - name: Save build artifact to Github Actions
+      - name: Save APK to Github Actions
         if: ${{ github.event.inputs.save-artifact }}
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.target }}
-          path: export/release/${{matrix.target}}/bin/
+          path: export/release/${{matrix.target}}/bin/app-debug.apk
       - name: Upload build artifacts
         uses: ./.github/actions/upload-itch
         with:
